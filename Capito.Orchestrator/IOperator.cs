@@ -1,10 +1,13 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace Capito.Orchestrator
 {
     interface IOperator
     {
+        string Name { get; }
         Request Request { get; set; }
-        Task<ProcessorOutput> Perform();
+        ProcessorOutput Perform();
+
     }
 }

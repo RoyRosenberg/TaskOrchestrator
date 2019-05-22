@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capito.Console", "Capito.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capito.Orchestrator", "Capito.Orchestrator\Capito.Orchestrator.csproj", "{BAF24684-35BF-46ED-9682-AA14E4E75D06}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capito.Test", "Capito.Test\Capito.Test.csproj", "{45766721-24A3-4235-AEAA-7F2DBC25B191}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{BAF24684-35BF-46ED-9682-AA14E4E75D06}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BAF24684-35BF-46ED-9682-AA14E4E75D06}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BAF24684-35BF-46ED-9682-AA14E4E75D06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{45766721-24A3-4235-AEAA-7F2DBC25B191}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{45766721-24A3-4235-AEAA-7F2DBC25B191}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{45766721-24A3-4235-AEAA-7F2DBC25B191}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{45766721-24A3-4235-AEAA-7F2DBC25B191}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
