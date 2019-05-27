@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,13 +10,12 @@ namespace Capito.Orchestrator
 {
     public class Orchestrator
     {
-        private List<RequestProcessor> _list;
+        private ICollection<RequestProcessor> _list;
         public ILogger Logger { get; set; }
         private CancellationTokenSource _tokenSource;
         private CancellationToken _cancellationToken;
         const int PERIOD = 10;
         private Task _newRequestHanlder;
-
         public Orchestrator()
         {
             _list = new List<RequestProcessor>();
@@ -49,29 +49,60 @@ namespace Capito.Orchestrator
         public void StartProcessingRequests()
         {
             // load all (10) not-done requests from DB
-            List<Request> requestsToProcess = LoadOpenRequests();
-            //List<Task> processTasks = new List<Task>();
+            BlockingCollection<Request> requestsToProcess = LoadOpenRequests();
+                        
             // process each request
             foreach (Request req in requestsToProcess)
             {
                 RequestProcessor proc = new RequestProcessor(req);
-                _list.Add(proc);//dont need?
+                _list.Add(proc);
                 proc.Process();
-                //processTasks.Add(proc.Process(_cancellationToken));
-            }            
+            }
+            TrackRequestStatus();
+        }
+
+        /// <summary>
+        /// Create new task that checks when a request processor finishes and start the next one 
+        /// </summary>
+        private void TrackRequestStatus()
+        {
+            Task.Factory.StartNew(() => {
+                while(!_cancellationToken.IsCancellationRequested)
+                {
+                    var proc = _list.FirstOrDefault(t => t.Status == ResultStatus.Completed);
+                    if(proc != null)
+                    {
+                        //remove the finied processor
+                        _list.Remove(proc);                      
+                        if (_cancellationToken.IsCancellationRequested)
+                            break;
+                        //get the next request from DB
+                        var nextReq = LoadOpenRequests().FirstOrDefault();
+                        if (nextReq != null)
+                        {
+                            proc = new RequestProcessor(nextReq);
+                            _list.Add(proc);
+                            if (_cancellationToken.IsCancellationRequested)
+                                break;
+                            proc.Process();
+                        }
+                    }
+                    Wait();
+                }
+            }, _cancellationToken);
         }
 
         public void Cancel()
         {
             Logger.WriteInfo("Cancelling...");
             _tokenSource.Cancel();
-            _list.ForEach(t => t.Cancel());
+            _list.ToList().ForEach(t => t.Cancel());
             Logger.WriteInfo("Waiting for all to response...");
             Task.WaitAll(new Task[] { _newRequestHanlder });
             Logger.WriteInfo("Finished");
         }
 
-        private List<Request> LoadOpenRequests()
+        private BlockingCollection<Request> LoadOpenRequests()
         {
             //Get all ready, in progress requests
             throw new NotImplementedException();
@@ -79,14 +110,15 @@ namespace Capito.Orchestrator
         
         private void Wait()
         {
-            int waitTime = PERIOD;
-            while(waitTime > 0)
-            {
-                Thread.Sleep(1000);
-                if (_cancellationToken.IsCancellationRequested)
-                    return;
-                waitTime--;
-            }
+            //int waitTime = PERIOD;
+            //while(waitTime > 0)
+            //{
+            //    Thread.Sleep(1000);
+            //    if (_cancellationToken.IsCancellationRequested)
+            //        return;
+            //    waitTime--;
+            //}
+            Task.Delay(PERIOD, _cancellationToken).Wait();
         }
     }
 }

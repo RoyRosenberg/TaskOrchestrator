@@ -47,7 +47,6 @@ namespace Capito.Orchestrator
                         //Update DB with Status and error
                         return;
                     }
-                    
                 }
             }, _cancellationToken);
         }
