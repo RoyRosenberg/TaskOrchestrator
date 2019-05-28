@@ -3,9 +3,9 @@ using System.Threading.Tasks;
 
 namespace Capito.Orchestrator
 {
-    interface IOperator
+    public interface IOperator
     {
-        string Name { get; }
+        string Name { get; set; }
         Request Request { get; set; }
         ProcessorOutput Perform();
 

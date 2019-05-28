@@ -12,7 +12,7 @@ namespace Capito.Test
         {
             Orchestrator.Orchestrator target = new Orchestrator.Orchestrator();
             target.Logger = new TestLogger(TestContext);
-            target.StartListeningForNewRequests();
+            target.Start();
             System.Threading.Thread.Sleep(500);
             target.Cancel();
         }

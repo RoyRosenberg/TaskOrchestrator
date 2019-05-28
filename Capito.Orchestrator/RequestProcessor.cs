@@ -9,19 +9,17 @@ namespace Capito.Orchestrator
 {
     public class RequestProcessor
     {
-        private Request _req;
-        private List<IOperator> _tasks;
+        public Request Request { get; private set; }
+        private IList<IOperator> _tasks;
         private CancellationTokenSource _tokenSource;
         private CancellationToken _cancellationToken;
         private Task _worker;
         public ResultStatus Status { get; set; }
+        public IRequestRepository RequestRepository { get; set; }
 
         public RequestProcessor(Request req)
         {
-            this._req = req;
-            //load all tasks (consider using factory)
-            _tasks = new List<IOperator>();
-            _tasks.Add(new Tasks.CopyTask() { Request = req });
+            this.Request = req;            
             _tokenSource = new CancellationTokenSource();
             _cancellationToken = _tokenSource.Token;
         }
@@ -32,27 +30,39 @@ namespace Capito.Orchestrator
             {
                 if (_cancellationToken.IsCancellationRequested)
                     return; //todo: handle cancelation 
+                LoadRequestOperation();
                 Status = ResultStatus.InProgress;
+                Request.Status = RequestStatus.InProgress;
                 foreach (var item in _tasks)
                 {
                     //todo: handle retry in case of failure
                     if (Status != ResultStatus.InProgress)
                         break;
                     if (_cancellationToken.IsCancellationRequested)
-                        return;
+                        return;                    
                     var res = item.Perform();
                     if (res.Status == ResultStatus.Failed)
                     {
                         this.Status = res.Status;
+                        Request.Status = RequestStatus.Completed;//todo: change?
                         //Update DB with Status and error
                         return;
                     }
                 }
+                this.Status = ResultStatus.Completed;
+                Request.Status = RequestStatus.Completed;
             }, _cancellationToken);
+        }
+
+        private void LoadRequestOperation()
+        {
+            //load all tasks (consider using factory)
+            _tasks = RequestRepository.GetRequestOperations(Request);            
         }
 
         public void Cancel()
         {
+            //todo: cancel to IOperator
             _tokenSource.Cancel();
             _worker.Wait();
         }

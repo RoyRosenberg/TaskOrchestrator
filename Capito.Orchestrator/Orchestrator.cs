@@ -10,12 +10,13 @@ namespace Capito.Orchestrator
 {
     public class Orchestrator
     {
-        private ICollection<RequestProcessor> _list;
+        private List<RequestProcessor> _list;
+        public IRequestRepository RequestRepository { get; set; }
         public ILogger Logger { get; set; }
         private CancellationTokenSource _tokenSource;
         private CancellationToken _cancellationToken;
-        const int PERIOD = 10;
-        private Task _newRequestHanlder;
+        const int PERIOD = 10;        
+        private Task _runner;
         public Orchestrator()
         {
             _list = new List<RequestProcessor>();
@@ -23,43 +24,56 @@ namespace Capito.Orchestrator
             _cancellationToken = _tokenSource.Token;
         }
 
-        public void StartListeningForNewRequests()
-        {
-            _newRequestHanlder = Task.Factory.StartNew(() => {
-                //create task that every 10 seconds checks for new requests in DB
+        public void Start()
+        {            
+            _runner = Task.Factory.StartNew(() => {
                 while (!_cancellationToken.IsCancellationRequested)
                 {
-                    Logger.WriteInfo($"Waiting for {PERIOD} seconds");
-                    Wait();
+                    if (!_cancellationToken.IsCancellationRequested)
+                        //check for new request and make them Ready
+                        HandleNewRequests();
 
                     if (!_cancellationToken.IsCancellationRequested)
-                    {
-                        //get all incoming requests
-                        Logger.WriteInfo($"get all incoming requests");
-                        Logger.WriteInfo($"for each request, create its operations to perform");
-                        Logger.WriteInfo($"set request state to ready");
-                        Task.Delay(PERIOD * 100, _cancellationToken);
-                        //for each request, create its operations to perform
-                        //set request state to ready 
-                    }
-                }
-            }, _cancellationToken);
-        }
+                        //check if orchestrator can handle new request
+                        HandleIncomingReadyRequests();
 
-        public void StartProcessingRequests()
-        {
-            // load all (10) not-done requests from DB
-            BlockingCollection<Request> requestsToProcess = LoadOpenRequests();
-                        
-            // process each request
-            foreach (Request req in requestsToProcess)
-            {
-                RequestProcessor proc = new RequestProcessor(req);
-                _list.Add(proc);
-                proc.Process();
-            }
+                    Wait();
+                }
+                Logger.WriteInfo($"Orchestrator Cancelled");
+            }, _cancellationToken);
             TrackRequestStatus();
         }
+
+        private void HandleIncomingReadyRequests()
+        {
+            int currentCount = _list.Count;
+            if(currentCount < 10)
+            {
+                int amountToAdd = 10 - currentCount;
+                var readyRequests = RequestRepository.GetOpenRequests().Take(amountToAdd);
+                readyRequests.ToList().ForEach(r => {
+                    RequestProcessor proc = new RequestProcessor(r);
+                    proc.RequestRepository = RequestRepository;
+                    _list.Add(proc);
+                    proc.Process();
+                    Logger.WriteInfo($"Request {r.Id} started");
+                });
+            }
+        }
+
+        private void HandleNewRequests()
+        {
+            var requests = RequestRepository.GetNewRequests();
+            if (requests.Count > 0)
+            {
+                foreach (var r in requests)
+                {
+                    //Todo: make sure the request is ready to start and use cancel token if needed
+                    r.Status = RequestStatus.Ready;
+                }
+                Logger.WriteInfo($"Made {requests.Count} requests in ready state");
+            }
+        }        
 
         /// <summary>
         /// Create new task that checks when a request processor finishes and start the next one 
@@ -69,26 +83,16 @@ namespace Capito.Orchestrator
             Task.Factory.StartNew(() => {
                 while(!_cancellationToken.IsCancellationRequested)
                 {
-                    var proc = _list.FirstOrDefault(t => t.Status == ResultStatus.Completed);
-                    if(proc != null)
+                    var doneProcesses = _list.Where(t => t.Status == ResultStatus.Completed).ToList(); ;
+                    foreach (var process in doneProcesses)
                     {
-                        //remove the finied processor
-                        _list.Remove(proc);                      
-                        if (_cancellationToken.IsCancellationRequested)
-                            break;
-                        //get the next request from DB
-                        var nextReq = LoadOpenRequests().FirstOrDefault();
-                        if (nextReq != null)
-                        {
-                            proc = new RequestProcessor(nextReq);
-                            _list.Add(proc);
-                            if (_cancellationToken.IsCancellationRequested)
-                                break;
-                            proc.Process();
-                        }
-                    }
+                        Logger.WriteInfo($"Request {process.Request.Id} completed");                        
+                        _list.Remove(process);                        
+                        //update DB
+                    }                    
                     Wait();
                 }
+                //Logger.WriteInfo($"Stopped tracking ");
             }, _cancellationToken);
         }
 
@@ -98,14 +102,19 @@ namespace Capito.Orchestrator
             _tokenSource.Cancel();
             _list.ToList().ForEach(t => t.Cancel());
             Logger.WriteInfo("Waiting for all to response...");
-            Task.WaitAll(new Task[] { _newRequestHanlder });
+            //Task.WaitAll(new Task[] { _newRequestHanlder });
+            //_newRequestHanlder.Wait();
+            _runner.Wait();
             Logger.WriteInfo("Finished");
         }
 
         private BlockingCollection<Request> LoadOpenRequests()
         {
             //Get all ready, in progress requests
-            throw new NotImplementedException();
+            var list = RequestRepository.GetOpenRequests().Take(10);
+            var res = new BlockingCollection<Request>();
+            list.ToList().ForEach(r => res.Add(r));
+            return res;
         }  
         
         private void Wait()

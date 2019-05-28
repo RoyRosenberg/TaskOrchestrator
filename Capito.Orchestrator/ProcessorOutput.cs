@@ -14,4 +14,12 @@ namespace Capito.Orchestrator
         Completed,
         InProgress
     }
+
+    public enum RequestStatus
+    {
+        New,
+        Ready,
+        InProgress,
+        Completed
+    }
 }

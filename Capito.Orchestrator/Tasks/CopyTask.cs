@@ -11,7 +11,7 @@ namespace Capito.Orchestrator.Tasks
 {
     public class CopyTask : IOperator
     {
-        public string Name => "Copy File";
+        public string Name { get; set; }
         public Request Request { get; set; }
         public string Source { get; set; }
         public string Destination { get; set; }
