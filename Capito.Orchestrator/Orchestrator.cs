@@ -17,6 +17,7 @@ namespace Capito.Orchestrator
         private CancellationToken _cancellationToken;
         const int PERIOD = 10;        
         private Task _runner;
+        private object _locker = new object();
         public Orchestrator()
         {
             _list = new List<RequestProcessor>();
@@ -54,7 +55,7 @@ namespace Capito.Orchestrator
                 readyRequests.ToList().ForEach(r => {
                     RequestProcessor proc = new RequestProcessor(r);
                     proc.RequestRepository = RequestRepository;
-                    _list.Add(proc);
+                    AddNewRequestProcessor(proc);
                     proc.Process();
                     Logger.WriteInfo($"Request {r.Id} started");
                 });
@@ -87,7 +88,7 @@ namespace Capito.Orchestrator
                     foreach (var process in doneProcesses)
                     {
                         Logger.WriteInfo($"Request {process.Request.Id} completed");                        
-                        _list.Remove(process);                        
+                        RemoveRequestProcessor(process);                        
                         //update DB
                     }                    
                     Wait();
@@ -108,15 +109,6 @@ namespace Capito.Orchestrator
             Logger.WriteInfo("Finished");
         }
 
-        private BlockingCollection<Request> LoadOpenRequests()
-        {
-            //Get all ready, in progress requests
-            var list = RequestRepository.GetOpenRequests().Take(10);
-            var res = new BlockingCollection<Request>();
-            list.ToList().ForEach(r => res.Add(r));
-            return res;
-        }  
-        
         private void Wait()
         {
             //int waitTime = PERIOD;
@@ -127,7 +119,36 @@ namespace Capito.Orchestrator
             //        return;
             //    waitTime--;
             //}
-            Task.Delay(PERIOD, _cancellationToken).Wait();
+            try
+            {
+                Task.Delay(PERIOD, _cancellationToken).Wait();
+            }
+            catch
+            {
+                //do nothing
+
+            }
+            
+        }
+
+        private void AddNewRequestProcessor(RequestProcessor proc)
+        {
+            if (proc == null)
+                throw new ArgumentNullException("proc");
+            lock (_locker)
+            {
+                _list.Add(proc);
+            }
+        }
+
+        private void RemoveRequestProcessor(RequestProcessor proc)
+        {
+            if (proc == null)
+                throw new ArgumentNullException("proc");
+            lock (_locker)
+            {
+                _list.Remove(proc);
+            }
         }
     }
 }

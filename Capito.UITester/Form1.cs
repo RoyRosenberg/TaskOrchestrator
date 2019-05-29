@@ -36,6 +36,7 @@ namespace Capito.UITester
             //_orc.StartListeningForNewRequests();
             //_orc.StartProcessingRequests();
             _orc.Start();
+            numericUpDown1.Value = 0;
         }
         
         public IList<Request> GetOpenRequests()
@@ -70,9 +71,13 @@ namespace Capito.UITester
         private void button1_Click(object sender, EventArgs e)
         {
             int id = _list.Max(x => x.Id) + 1;
-            Request r = new Request() { Id = id };
-            r.Status = RequestStatus.New;
-            _list.Add(r);
+            for (int i = 0; i < numericUpDown1.Value; i++)
+            {
+                Request r = new Request() { Id = id + i };
+                r.Status = RequestStatus.New;
+                _list.Add(r);
+            }
+            
         }
 
         private void button3_Click(object sender, EventArgs e)
